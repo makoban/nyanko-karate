@@ -408,7 +408,7 @@ const game = {
 };
 
 const cat = { punchUntil: 0, dizzyUntil: 0, happyUntil: 0 };
-const monkey = { throwUntil: 0, cheerUntil: 0, bubble: null };  // bubble: {text, until}
+const monkey = { throwUntil: 0, cheerUntil: 0, oopsUntil: 0, bubble: null };  // bubble: {text, until}
 
 let songStartTime = 0;
 let nextMusicBeat = 0;
@@ -477,13 +477,12 @@ let catImgsLoaded = false;
 }
 
 // ---------------- モン吉スプライト (image2納品アセット) ----------------
-// ※ monkey_oops.png は生成崩壊のため再納品待ち。それ以外の5コマを使用。
 const MON_H = 200;
-const MON_FEET_Y = 815;
+const MON_FEET_Y = 870;
 const monImgs = {};
 let monImgsLoaded = false;
 {
-  const names = ["idle_01", "idle_02", "throw_01", "throw_02", "cheer"];
+  const names = ["idle_01", "idle_02", "throw_01", "throw_02", "cheer", "oops"];
   let loaded = 0, failed = false;
   names.forEach(nm => {
     const im = new Image();
@@ -492,6 +491,22 @@ let monImgsLoaded = false;
     im.src = `assets/characters/monkey/monkey_${nm}.png`;
     monImgs[nm] = im;
   });
+}
+
+// ---------------- 観客スプライト (image2納品アセット) ----------------
+const AUD_ANIMALS = ["rabbit", "dog", "frog", "hamster", "bear"];
+const audImgs = {};
+let audImgsLoaded = false;
+{
+  let loaded = 0, failed = false;
+  const total = AUD_ANIMALS.length * 2;
+  AUD_ANIMALS.forEach(a => ["01", "02"].forEach(f => {
+    const im = new Image();
+    im.onload = () => { if (++loaded === total && !failed) audImgsLoaded = true; };
+    im.onerror = () => { failed = true; };
+    im.src = `assets/characters/audience/aud_${a}_${f}.png`;
+    audImgs[`${a}_${f}`] = im;
+  }));
 }
 
 // ---------------- キャンバス ----------------
@@ -755,15 +770,26 @@ function drawScene(t) {
   }
 
   // かんきゃくのどうぶつたち (リズムでぴょこぴょこ)
-  const audience = ["🐰", "🐶", "🐸", "🐹", "🐻"];
-  ctx.font = "32px serif";
-  ctx.textAlign = "center";
-  audience.forEach((a, i) => {
-    const hopPhase = Math.abs(Math.sin((beat + i * 0.5) * Math.PI));
-    const hop = playing ? hopPhase * (game.streak >= 8 ? 16 : 8) : 0;
-    ctx.fillText(a, W * 0.12 + i * W * 0.19, H - 28 - hop);
-  });
-  ctx.textAlign = "left";
+  if (audImgsLoaded) {
+    const AUD_H = 110;
+    AUD_ANIMALS.forEach((a, i) => {
+      const hopPhase = Math.abs(Math.sin((beat + i * 0.5) * Math.PI));
+      const hop = playing ? hopPhase * (game.streak >= 8 ? 18 : 10) : 0;
+      const frame = playing && hopPhase > 0.55 ? "02" : "01";
+      const cx = W * 0.12 + i * W * 0.19;
+      ctx.drawImage(audImgs[`${a}_${frame}`], cx - AUD_H / 2, H - 14 - AUD_H - hop, AUD_H, AUD_H);
+    });
+  } else {
+    const audience = ["🐰", "🐶", "🐸", "🐹", "🐻"];
+    ctx.font = "32px serif";
+    ctx.textAlign = "center";
+    audience.forEach((a, i) => {
+      const hopPhase = Math.abs(Math.sin((beat + i * 0.5) * Math.PI));
+      const hop = playing ? hopPhase * (game.streak >= 8 ? 16 : 8) : 0;
+      ctx.fillText(a, W * 0.12 + i * W * 0.19, H - 28 - hop);
+    });
+    ctx.textAlign = "left";
+  }
 
   // 🐵 (投げる係)
   const throwing = t < monkey.throwUntil;
@@ -773,6 +799,9 @@ function drawScene(t) {
     let frame, yOff = -mBounce;
     if (throwing) {
       frame = (monkey.throwUntil - t > 0.12) ? "throw_01" : "throw_02";
+      yOff = 0;
+    } else if (t < monkey.oopsUntil) {
+      frame = "oops";
       yOff = 0;
     } else if (t < monkey.cheerUntil) {
       frame = "cheer";
@@ -1034,6 +1063,7 @@ setInterval(() => {
       game.streak = 0;
       game.judgement = { text: "あちゃ〜", color: "#9aa5b5", time: t };
       cat.dizzyUntil = t + 0.6;
+      monkey.oopsUntil = t + 0.6;
       sfxMiss();
     }
     // 🐵の投げモーション & ふきだし
@@ -1098,6 +1128,7 @@ function resetPlayState() {
   cat.punchUntil = cat.dizzyUntil = cat.happyUntil = 0;
   monkey.throwUntil = 0;
   monkey.cheerUntil = 0;
+  monkey.oopsUntil = 0;
   monkey.bubble = null;
   titleScreen.classList.add("hidden");
   resultScreen.classList.add("hidden");
