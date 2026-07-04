@@ -95,6 +95,24 @@
   }
   .btn.secondary:active { box-shadow: 0 1px 0 #3f96d6; }
 
+  .diff-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .diff-btn {
+    font-family: inherit;
+    font-size: 17px;
+    padding: 11px 20px;
+    border: 3px solid transparent;
+    border-radius: 18px;
+    cursor: pointer;
+    background: #fff;
+    color: #9a8060;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    transition: transform .1s;
+  }
+  .diff-btn:hover { transform: scale(1.06); }
+  .diff-btn.selected { border-color: #ff8c42; color: #ff8c42; font-weight: bold; }
+  .diff-btn.oni.selected { border-color: #e0446a; color: #e0446a; }
+  .diff-btn .stars { display: block; font-size: 12px; margin-top: 2px; }
+
   .howto {
     font-size: 14px;
     color: #9a8060;
@@ -161,6 +179,7 @@
     .medal { font-size: 60px; }
     .title-cat { width: 110px; height: 110px; }
     .result-cat { width: 120px; height: 120px; }
+    .diff-btn { font-size: 14px; padding: 9px 14px; }
     .result-grid { font-size: 15px; padding: 12px 22px; }
     .result-msg { font-size: 15px; }
   }
@@ -176,6 +195,11 @@
     <div class="cat-parade">🐱🥊 ✦ 🐵🍎</div>
     <h1 class="title">にゃんこカラテ</h1>
     <div class="subtitle">〜 リズムにのって ネコパンチ! 〜</div>
+    <div class="diff-row">
+      <button class="diff-btn selected" data-level="normal">ふつう<span class="stars">★☆☆</span></button>
+      <button class="diff-btn" data-level="hard">むずかしい<span class="stars">★★☆</span></button>
+      <button class="diff-btn oni" data-level="oni">おに<span class="stars">🔥🔥🔥</span></button>
+    </div>
     <button id="start-btn" class="btn">🥊 ほんばん スタート!</button>
     <button id="practice-btn" class="btn secondary">🎓 れんしゅうする</button>
     <div class="howto">
@@ -219,17 +243,22 @@
 ================================================================ */
 
 // ---------------- 基本設定 ----------------
-const BPM = 120;
-const BEAT = 60 / BPM;             // 0.5秒
-const PERFECT_WINDOW = 0.08;
-const GOOD_WINDOW = 0.16;
-const SONG_BEATS = 116;            // 曲の長さ(拍) ≒ 58秒
+// レベル: テンポ・判定幅・譜面密度の3つでシビアさが変わる
+const LEVELS = {
+  normal: { label: "ふつう",     bpm: 120, perfect: 0.080, good: 0.160 },
+  hard:   { label: "むずかしい", bpm: 132, perfect: 0.060, good: 0.120 },
+  oni:    { label: "おに",       bpm: 144, perfect: 0.045, good: 0.085 },
+};
+let BEAT = 60 / LEVELS.normal.bpm;           // 1拍の秒数 (レベルで変わる)
+let PERFECT_WINDOW = LEVELS.normal.perfect;
+let GOOD_WINDOW = LEVELS.normal.good;
+const SONG_BEATS = 116;            // 曲の長さ(拍)
 
 const THROW_EMOJIS = ["🧶", "🍎", "🍊", "⚾", "🍙"];
 
 // ---------------- 譜面 ----------------
 // type: norm=ふつう / dbl=ダブル / fish=おさかな(裏拍) / big=ラストの大物
-function buildChart() {
+function buildChart(level = "normal") {
   const chart = [];
   let id = 0;
   const add = (hitBeat, type = "norm", travelBeats = 2) => {
@@ -244,23 +273,40 @@ function buildChart() {
     });
   };
 
-  // ウォームアップ: 4拍ごと
-  [8, 12, 16, 20].forEach(b => add(b));
-  // 2拍ごと
-  for (let b = 24; b <= 38; b += 2) add(b);
-  // ダブル「ハイハイッ!」
-  [[42, 43], [46, 47], [50, 51], [54, 55]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
-  // おさかな(裏拍)
-  add(58.5, "fish");
-  add(62.5, "fish");
-  // 2拍ごと(2週目)
-  for (let b = 66; b <= 80; b += 2) add(b);
-  // ダブル(2週目)
-  [[84, 85], [88, 89], [92, 93], [96, 97]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
-  // フィナーレ: 毎拍ラッシュ!
-  for (let b = 100; b <= 107; b++) add(b);
-  // ラストの大物 (3拍かけてゆっくり飛んでくる)
-  add(111, "big", 3);
+  if (level === "oni") {
+    // 🔥 おに: 半拍ダブル連発+裏拍サカナ+高密度フィナーレ (約91ノーツ)
+    for (let b = 8; b <= 20; b++) add(b);                                  // 毎拍ウォームアップ
+    for (let b = 24; b <= 38; b += 2) { add(b, "dbl"); add(b + 0.5, "dbl"); }  // 半拍ダブル
+    [42.5, 44.5, 46.5, 48.5].forEach(b => add(b, "fish"));                 // 裏拍サカナ4連
+    for (let b = 52; b <= 62; b++) { add(b); if (b % 3 === 1) add(b + 0.5, "dbl"); }
+    for (let b = 66; b <= 80; b++) add(b);                                 // 毎拍ラッシュ
+    for (let b = 84; b <= 96; b += 2) { add(b, "dbl"); add(b + 0.5, "dbl"); } // 半拍ダブル2週目
+    for (let b = 100; b <= 107; b++) { add(b); if (b % 2 === 0) add(b + 0.5, "dbl"); } // 鬼フィナーレ
+    add(109.5, "fish");
+    add(112, "big", 3);
+  } else if (level === "hard") {
+    // ★★ むずかしい: 毎拍ラッシュ増量+ダブル5連+サカナ3連 (約70ノーツ)
+    for (let b = 8; b <= 20; b += 2) add(b);
+    for (let b = 24; b <= 38; b++) add(b);
+    [[42, 43], [45, 46], [48, 49], [51, 52], [54, 55]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    [58.5, 60.5, 62.5].forEach(b => add(b, "fish"));
+    for (let b = 66; b <= 80; b++) add(b);
+    [[84, 85], [87, 88], [90, 91], [93, 94], [96, 97]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    for (let b = 100; b <= 107; b++) add(b);
+    add(109.5, "fish");
+    add(112, "big", 3);
+  } else {
+    // ★ ふつう
+    [8, 12, 16, 20].forEach(b => add(b));
+    for (let b = 24; b <= 38; b += 2) add(b);
+    [[42, 43], [46, 47], [50, 51], [54, 55]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    add(58.5, "fish");
+    add(62.5, "fish");
+    for (let b = 66; b <= 80; b += 2) add(b);
+    [[84, 85], [88, 89], [92, 93], [96, 97]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    for (let b = 100; b <= 107; b++) add(b);
+    add(111, "big", 3);
+  }
 
   return chart;
 }
@@ -398,6 +444,7 @@ function scheduleCue(note, when) {
 // ---------------- ゲーム状態 ----------------
 const game = {
   state: "title",   // title | play | practice | result
+  level: "normal",  // normal | hard | oni
   chart: [],
   counts: { perfect: 0, good: 0, miss: 0 },
   streak: 0,
@@ -968,8 +1015,13 @@ function drawFx(t) {
     const progress = Math.min(Math.max(songTime() / (SONG_BEATS * BEAT), 0), 1);
     ctx.fillStyle = "rgba(255,255,255,.6)";
     ctx.fillRect(0, 0, W, 6);
-    ctx.fillStyle = "#ffa552";
+    ctx.fillStyle = game.level === "oni" ? "#e0446a" : "#ffa552";
     ctx.fillRect(0, 0, W * progress, 6);
+    // レベル表示
+    ctx.fillStyle = game.level === "oni" ? "#e0446a" : "#b08050";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`${game.level === "oni" ? "🔥" : "🎵"} ${LEVELS[game.level].label}`, 14, 32);
   } else {
     // れんしゅう表示 (狭い画面では短縮)
     ctx.fillStyle = "#8a7050";
@@ -1137,10 +1189,18 @@ function resetPlayState() {
   clearTimeout(schedulerTimer);
 }
 
+function applyLevel(levelKey) {
+  const lv = LEVELS[levelKey];
+  BEAT = 60 / lv.bpm;
+  PERFECT_WINDOW = lv.perfect;
+  GOOD_WINDOW = lv.good;
+}
+
 function startGame() {
   initAudio();
+  applyLevel(game.level);
   resetPlayState();
-  game.chart = buildChart();
+  game.chart = buildChart(game.level);
   game.state = "play";
   practiceBar.classList.add("hidden");
   schedulerTick();
@@ -1148,6 +1208,7 @@ function startGame() {
 
 function startPractice() {
   initAudio();
+  applyLevel("normal");   // れんしゅうはゆっくり・ゆるゆる判定
   resetPlayState();
   game.chart = [];
   game.practiceLastBeat = 4;
@@ -1196,7 +1257,7 @@ function endGame() {
   const rankEl = document.getElementById("rank-display");
   rankEl.textContent = rank;
   rankEl.style.color = rankColor;
-  document.getElementById("result-msg").textContent = msg;
+  document.getElementById("result-msg").textContent = `【${LEVELS[game.level].label}】${msg}`;
   document.getElementById("r-perfect").textContent = game.counts.perfect;
   document.getElementById("r-good").textContent = game.counts.good;
   document.getElementById("r-miss").textContent = game.counts.miss;
@@ -1208,6 +1269,14 @@ function endGame() {
   const notes = score >= 0.55 ? [523.25, 659.26, 783.99, 1046.5] : [392, 349.23, 329.63];
   notes.forEach((f, i) => playTone(f, t + i * 0.14, 0.4, 0.2));
 }
+
+document.querySelectorAll(".diff-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".diff-btn").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    game.level = btn.dataset.level;
+  });
+});
 
 document.getElementById("start-btn").addEventListener("click", startGame);
 document.getElementById("retry-btn").addEventListener("click", startGame);
