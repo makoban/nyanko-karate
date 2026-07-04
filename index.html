@@ -408,7 +408,7 @@ const game = {
 };
 
 const cat = { punchUntil: 0, dizzyUntil: 0, happyUntil: 0 };
-const monkey = { throwUntil: 0, bubble: null };  // bubble: {text, until}
+const monkey = { throwUntil: 0, cheerUntil: 0, bubble: null };  // bubble: {text, until}
 
 let songStartTime = 0;
 let nextMusicBeat = 0;
@@ -473,6 +473,24 @@ let catImgsLoaded = false;
     im.onerror = () => { failed = true; };
     im.src = `assets/characters/cat/cat_${nm}.png`;
     catImgs[nm] = im;
+  });
+}
+
+// ---------------- モン吉スプライト (image2納品アセット) ----------------
+// ※ monkey_oops.png は生成崩壊のため再納品待ち。それ以外の5コマを使用。
+const MON_H = 200;
+const MON_FEET_Y = 815;
+const monImgs = {};
+let monImgsLoaded = false;
+{
+  const names = ["idle_01", "idle_02", "throw_01", "throw_02", "cheer"];
+  let loaded = 0, failed = false;
+  names.forEach(nm => {
+    const im = new Image();
+    im.onload = () => { if (++loaded === names.length && !failed) monImgsLoaded = true; };
+    im.onerror = () => { failed = true; };
+    im.src = `assets/characters/monkey/monkey_${nm}.png`;
+    monImgs[nm] = im;
   });
 }
 
@@ -750,13 +768,31 @@ function drawScene(t) {
   // 🐵 (投げる係)
   const throwing = t < monkey.throwUntil;
   const mBounce = playing ? Math.abs(Math.sin(beat * Math.PI)) * 6 : 0;
-  ctx.save();
-  ctx.translate(throwerX, throwerY - mBounce);
-  if (throwing) { ctx.rotate(-0.18); ctx.scale(1.12, 1.12); }
-  ctx.font = "64px serif";
-  ctx.textAlign = "center";
-  ctx.fillText("🐵", 0, 20);
-  ctx.restore();
+  if (monImgsLoaded) {
+    // スプライト版: 投げ(振りかぶり→リリース) / ばんざい / 待機
+    let frame, yOff = -mBounce;
+    if (throwing) {
+      frame = (monkey.throwUntil - t > 0.12) ? "throw_01" : "throw_02";
+      yOff = 0;
+    } else if (t < monkey.cheerUntil) {
+      frame = "cheer";
+      yOff = -8;
+    } else {
+      frame = Math.floor(beat) % 2 === 0 ? "idle_01" : "idle_02";
+    }
+    const k = MON_H / 1024;
+    const mx = throwerX - MON_H / 2;
+    const my = groundY + (1024 - MON_FEET_Y) * k - MON_H + yOff;
+    ctx.drawImage(monImgs[frame], mx, my, MON_H, MON_H);
+  } else {
+    ctx.save();
+    ctx.translate(throwerX, throwerY - mBounce);
+    if (throwing) { ctx.rotate(-0.18); ctx.scale(1.12, 1.12); }
+    ctx.font = "64px serif";
+    ctx.textAlign = "center";
+    ctx.fillText("🐵", 0, 20);
+    ctx.restore();
+  }
 
   // 🐵のふきだし (かけ声)
   if (monkey.bubble && t < monkey.bubble.until) {
@@ -843,9 +879,11 @@ function drawNotes(t) {
     }
 
     if (prog > 1.3) return;
-    // 放物線で飛んでくる
-    const x = throwerX - 30 + (punchX - throwerX + 30) * prog;
-    const y = (throwerY - 30) + (punchY - throwerY + 30) * prog - Math.sin(Math.min(prog, 1) * Math.PI) * 95;
+    // 放物線で飛んでくる (スプライト時は振りかぶった手の位置から)
+    const startX = monImgsLoaded ? throwerX + 25 : throwerX - 30;
+    const startY = monImgsLoaded ? groundY - 125 : throwerY - 30;
+    const x = startX + (punchX - startX) * prog;
+    const y = startY + (punchY - startY) * prog - Math.sin(Math.min(prog, 1) * Math.PI) * 95;
     const size = n.type === "big" ? 54 : 36;
     ctx.save();
     ctx.translate(x, y);
@@ -976,6 +1014,7 @@ function punchAction() {
   game.maxStreak = Math.max(game.maxStreak, game.streak);
   cat.happyUntil = t + 0.4;
   cat.dizzyUntil = 0;
+  monkey.cheerUntil = t + 0.35;
   spawnHitParticles(perfect);
   sfxHit(perfect);
 }
@@ -1058,6 +1097,7 @@ function resetPlayState() {
   game.judgement = null;
   cat.punchUntil = cat.dizzyUntil = cat.happyUntil = 0;
   monkey.throwUntil = 0;
+  monkey.cheerUntil = 0;
   monkey.bubble = null;
   titleScreen.classList.add("hidden");
   resultScreen.classList.add("hidden");
