@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#aee4ff">
+<title>にゃんこカラテ 🐱🥊 〜リズムでポン!〜</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: "Hiragino Maru Gothic ProN", "Rounded Mplus 1c", "Yu Gothic", sans-serif;
+    background: linear-gradient(180deg, #aee4ff 0%, #dff4ff 45%, #fff7e6 100%);
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+    position: fixed;
+    inset: 0;
+  }
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    margin: 0 auto;
+    max-width: 900px;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: rgba(255, 248, 240, 0.93);
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay.hidden { display: none; }
+
+  h1.title {
+    font-size: 46px;
+    color: #ff8c42;
+    text-shadow: 0 3px 0 #fff, 0 6px 14px rgba(255,140,66,.3);
+    letter-spacing: 3px;
+  }
+  .subtitle { font-size: 17px; color: #b08050; }
+
+  .cat-parade { font-size: 44px; letter-spacing: 6px; animation: bob 1s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+  .title-cat {
+    width: 150px;
+    height: 150px;
+    animation: bob 1s ease-in-out infinite;
+  }
+  .result-cat {
+    width: 160px;
+    height: 160px;
+    animation: pop .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  .result-cat.hidden, .medal.hidden { display: none; }
+
+  .btn {
+    font-family: inherit;
+    font-size: 21px;
+    padding: 15px 42px;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(135deg, #ffa552, #ff8c42);
+    box-shadow: 0 5px 0 #e0722a, 0 8px 16px rgba(255,140,66,.35);
+    transition: transform .1s, box-shadow .1s;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #e0722a; }
+  .btn.secondary {
+    font-size: 17px;
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #8fd3ff, #5eb8f7);
+    box-shadow: 0 5px 0 #3f96d6, 0 8px 16px rgba(94,184,247,.35);
+  }
+  .btn.secondary:active { box-shadow: 0 1px 0 #3f96d6; }
+
+  .diff-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .diff-btn {
+    font-family: inherit;
+    font-size: 17px;
+    padding: 11px 20px;
+    border: 3px solid transparent;
+    border-radius: 18px;
+    cursor: pointer;
+    background: #fff;
+    color: #9a8060;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    transition: transform .1s;
+  }
+  .diff-btn:hover { transform: scale(1.06); }
+  .diff-btn.selected { border-color: #ff8c42; color: #ff8c42; font-weight: bold; }
+  .diff-btn.oni.selected { border-color: #e0446a; color: #e0446a; }
+  .diff-btn .stars { display: block; font-size: 12px; margin-top: 2px; }
+
+  .howto {
+    font-size: 14px;
+    color: #9a8060;
+    line-height: 2;
+    background: rgba(255,255,255,.75);
+    border-radius: 16px;
+    padding: 12px 22px;
+  }
+  kbd {
+    background: #fff;
+    border: 1px solid #f0d0a0;
+    border-bottom-width: 3px;
+    border-radius: 6px;
+    padding: 1px 10px;
+    font-family: inherit;
+    color: #ff8c42;
+    font-weight: bold;
+  }
+
+  /* ---------- result ---------- */
+  .rank-big {
+    font-size: 54px;
+    font-weight: bold;
+    line-height: 1.2;
+    animation: pop .5s cubic-bezier(.2,1.6,.4,1);
+  }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+  .medal { font-size: 80px; animation: pop .6s cubic-bezier(.2,1.6,.4,1); }
+  .result-grid {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 6px 26px;
+    font-size: 18px;
+    color: #8a7050;
+    background: rgba(255,255,255,.85);
+    border-radius: 20px;
+    padding: 16px 34px;
+  }
+  .result-grid .val { text-align: right; font-weight: bold; color: #ff8c42; }
+  .result-msg { font-size: 19px; color: #a08060; }
+
+  /* ---------- practice UI ---------- */
+  #practice-bar {
+    position: absolute;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    z-index: 5;
+  }
+  #practice-bar.hidden { display: none; }
+
+  /* ---------- スマホ(狭い画面)調整 ---------- */
+  @media (max-width: 520px) {
+    h1.title { font-size: 34px; }
+    .subtitle { font-size: 14px; }
+    .cat-parade { font-size: 34px; letter-spacing: 4px; }
+    .btn { font-size: 18px; padding: 13px 32px; }
+    .btn.secondary { font-size: 15px; padding: 11px 24px; }
+    .howto { font-size: 12px; padding: 10px 14px; }
+    .overlay { gap: 13px; }
+    .rank-big { font-size: 40px; }
+    .medal { font-size: 60px; }
+    .title-cat { width: 110px; height: 110px; }
+    .result-cat { width: 120px; height: 120px; }
+    .diff-btn { font-size: 14px; padding: 9px 14px; }
+    .result-grid { font-size: 15px; padding: 12px 22px; }
+    .result-msg { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas"></canvas>
+
+  <!-- タイトル画面 -->
+  <div id="title-screen" class="overlay">
+    <img id="title-cat" class="title-cat" src="assets/characters/cat/cat_happy_01.png" alt="" onerror="this.style.display='none'">
+    <div class="cat-parade">🐱🥊 ✦ 🐵🍎</div>
+    <h1 class="title">にゃんこカラテ</h1>
+    <div class="subtitle">〜 リズムにのって ネコパンチ! 〜</div>
+    <div class="diff-row">
+      <button class="diff-btn selected" data-level="normal">ふつう<span class="stars">★☆☆</span></button>
+      <button class="diff-btn" data-level="hard">むずかしい<span class="stars">★★☆</span></button>
+      <button class="diff-btn oni" data-level="oni">おに<span class="stars">🔥🔥🔥</span></button>
+    </div>
+    <button id="start-btn" class="btn">🥊 ほんばん スタート!</button>
+    <button id="practice-btn" class="btn secondary">🎓 れんしゅうする</button>
+    <div class="howto">
+      🐵が「<b>ハイッ!</b>」と なげたら <b>2はく あと</b>に ポン!<br>
+      <kbd>スペース</kbd> か <b>がめんタップ</b>で ネコパンチ 🥊<br>
+      「ハイハイッ!」は 2れんぞく! 🐟は ちょっと おそい!
+    </div>
+  </div>
+
+  <!-- リザルト画面 -->
+  <div id="result-screen" class="overlay hidden">
+    <img id="result-cat" class="result-cat hidden" alt="">
+    <div class="medal" id="medal-display">🥇</div>
+    <div class="rank-big" id="rank-display">ハイレベル!!</div>
+    <div class="result-msg" id="result-msg"></div>
+    <div class="result-grid">
+      <span>ピタッ!(パーフェクト)</span><span class="val" id="r-perfect">0</span>
+      <span>セーフ(グッド)</span><span class="val" id="r-good">0</span>
+      <span>あちゃ〜(ミス)</span><span class="val" id="r-miss">0</span>
+      <span>さいだいれんぞく</span><span class="val" id="r-streak">0</span>
+    </div>
+    <div style="display:flex; gap:12px;">
+      <button id="retry-btn" class="btn">もういちど!</button>
+      <button id="back-btn" class="btn secondary">タイトルへ</button>
+    </div>
+  </div>
+
+  <!-- れんしゅう中の下部バー -->
+  <div id="practice-bar" class="hidden">
+    <button id="end-practice-btn" class="btn secondary">ばっちり! ほんばんへ →</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ================================================================
+   にゃんこカラテ — リズム天国風ワンボタンリズムゲーム
+   🐵が投げたものを、2拍後にタイミングよくネコパンチ!
+   音楽・効果音はすべて Web Audio API で生成(音源ファイル不要)
+================================================================ */
+
+// ---------------- 基本設定 ----------------
+// レベル: テンポ・判定幅・譜面密度の3つでシビアさが変わる
+const LEVELS = {
+  normal: { label: "ふつう",     bpm: 120, perfect: 0.080, good: 0.160 },
+  hard:   { label: "むずかしい", bpm: 132, perfect: 0.060, good: 0.120 },
+  oni:    { label: "おに",       bpm: 144, perfect: 0.045, good: 0.085 },
+};
+let BEAT = 60 / LEVELS.normal.bpm;           // 1拍の秒数 (レベルで変わる)
+let PERFECT_WINDOW = LEVELS.normal.perfect;
+let GOOD_WINDOW = LEVELS.normal.good;
+const SONG_BEATS = 116;            // 曲の長さ(拍)
+
+const THROW_EMOJIS = ["🧶", "🍎", "🍊", "⚾", "🍙"];
+
+// ---------------- 譜面 ----------------
+// type: norm=ふつう / dbl=ダブル / fish=おさかな(裏拍) / big=ラストの大物
+function buildChart(level = "normal") {
+  const chart = [];
+  let id = 0;
+  const add = (hitBeat, type = "norm", travelBeats = 2) => {
+    chart.push({
+      id: id++,
+      hitBeat,
+      cueBeat: hitBeat - travelBeats,
+      type,
+      emoji: type === "fish" ? "🐟" : type === "big" ? "🐡" : THROW_EMOJIS[id % THROW_EMOJIS.length],
+      cued: false, hit: false, missed: false,
+      hitInfo: null, missedAt: 0,
+    });
+  };
+
+  if (level === "oni") {
+    // 🔥 おに: 半拍ダブル連発+裏拍サカナ+高密度フィナーレ (約91ノーツ)
+    for (let b = 8; b <= 20; b++) add(b);                                  // 毎拍ウォームアップ
+    for (let b = 24; b <= 38; b += 2) { add(b, "dbl"); add(b + 0.5, "dbl"); }  // 半拍ダブル
+    [42.5, 44.5, 46.5, 48.5].forEach(b => add(b, "fish"));                 // 裏拍サカナ4連
+    for (let b = 52; b <= 62; b++) { add(b); if (b % 3 === 1) add(b + 0.5, "dbl"); }
+    for (let b = 66; b <= 80; b++) add(b);                                 // 毎拍ラッシュ
+    for (let b = 84; b <= 96; b += 2) { add(b, "dbl"); add(b + 0.5, "dbl"); } // 半拍ダブル2週目
+    for (let b = 100; b <= 107; b++) { add(b); if (b % 2 === 0) add(b + 0.5, "dbl"); } // 鬼フィナーレ
+    add(109.5, "fish");
+    add(112, "big", 3);
+  } else if (level === "hard") {
+    // ★★ むずかしい: 毎拍ラッシュ増量+ダブル5連+サカナ3連 (約70ノーツ)
+    for (let b = 8; b <= 20; b += 2) add(b);
+    for (let b = 24; b <= 38; b++) add(b);
+    [[42, 43], [45, 46], [48, 49], [51, 52], [54, 55]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    [58.5, 60.5, 62.5].forEach(b => add(b, "fish"));
+    for (let b = 66; b <= 80; b++) add(b);
+    [[84, 85], [87, 88], [90, 91], [93, 94], [96, 97]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    for (let b = 100; b <= 107; b++) add(b);
+    add(109.5, "fish");
+    add(112, "big", 3);
+  } else {
+    // ★ ふつう
+    [8, 12, 16, 20].forEach(b => add(b));
+    for (let b = 24; b <= 38; b += 2) add(b);
+    [[42, 43], [46, 47], [50, 51], [54, 55]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    add(58.5, "fish");
+    add(62.5, "fish");
+    for (let b = 66; b <= 80; b += 2) add(b);
+    [[84, 85], [88, 89], [92, 93], [96, 97]].forEach(([a, b]) => { add(a, "dbl"); add(b, "dbl"); });
+    for (let b = 100; b <= 107; b++) add(b);
+    add(111, "big", 3);
+  }
+
+  return chart;
+}
+
+// ---------------- Web Audio ----------------
+let audioCtx = null;
+let masterGain = null;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.55;
+    masterGain.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playTone(freq, when, dur, vol = 0.25, type = "triangle") {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, when);
+  g.gain.linearRampToValueAtTime(vol, when + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.001, when + dur);
+  osc.connect(g).connect(masterGain);
+  osc.start(when);
+  osc.stop(when + dur + 0.05);
+}
+
+function playKick(when) {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.frequency.setValueAtTime(140, when);
+  osc.frequency.exponentialRampToValueAtTime(42, when + 0.1);
+  g.gain.setValueAtTime(0.45, when);
+  g.gain.exponentialRampToValueAtTime(0.001, when + 0.13);
+  osc.connect(g).connect(masterGain);
+  osc.start(when);
+  osc.stop(when + 0.16);
+}
+
+function noiseBurst(when, dur, filterType, freq, vol) {
+  const buf = audioCtx.createBuffer(1, Math.ceil(audioCtx.sampleRate * dur), audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const src = audioCtx.createBufferSource();
+  const f = audioCtx.createBiquadFilter();
+  const g = audioCtx.createGain();
+  f.type = filterType;
+  f.frequency.value = freq;
+  g.gain.value = vol;
+  src.buffer = buf;
+  src.connect(f).connect(g).connect(masterGain);
+  src.start(when);
+}
+const playHat  = when => noiseBurst(when, 0.04, "highpass", 7500, 0.1);
+const playClap = when => noiseBurst(when, 0.09, "bandpass", 2000, 0.2);
+
+// 「ハイッ!」っぽいかけ声 (2音のブリップ)
+function voiceHai(when, high = false) {
+  const base = high ? 880 : 660;
+  playTone(base, when, 0.09, 0.3, "square");
+  playTone(base * 1.35, when + 0.07, 0.11, 0.28, "square");
+}
+// 「サカナ〜!」っぽい上昇音
+function voiceFish(when) {
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(500, when);
+  osc.frequency.exponentialRampToValueAtTime(1100, when + 0.25);
+  g.gain.setValueAtTime(0.22, when);
+  g.gain.exponentialRampToValueAtTime(0.001, when + 0.3);
+  osc.connect(g).connect(masterGain);
+  osc.start(when);
+  osc.stop(when + 0.35);
+}
+function whoosh(when) { noiseBurst(when, 0.16, "bandpass", 1100, 0.18); }
+
+function sfxHit(perfect) {
+  const t = audioCtx.currentTime;
+  noiseBurst(t, 0.06, "bandpass", 3000, 0.25);           // パンチ!
+  playTone(perfect ? 1318.5 : 1046.5, t + 0.01, 0.14, 0.25, "sine");
+  if (perfect) playTone(1975.5, t + 0.05, 0.12, 0.15, "sine");
+}
+function sfxMiss() {
+  const t = audioCtx.currentTime;
+  playTone(220, t, 0.1, 0.2, "square");
+  playTone(160, t + 0.1, 0.18, 0.2, "square");           // ズコー
+}
+function sfxWhiff() {
+  noiseBurst(audioCtx.currentTime, 0.08, "bandpass", 900, 0.08);
+}
+
+// ---------------- 音楽 (バッキング) ----------------
+// C - Am - F - G のかわいい4つ打ちループ
+const CHORDS = [
+  { root: 130.81, tones: [261.63, 329.63, 392.00] },  // C
+  { root: 110.00, tones: [220.00, 261.63, 329.63] },  // Am
+  { root:  87.31, tones: [174.61, 220.00, 261.63] },  // F
+  { root:  98.00, tones: [196.00, 246.94, 293.66] },  // G
+];
+
+function scheduleMusic(beat, when) {
+  const chord = CHORDS[Math.floor(beat / 4) % 4];
+
+  if (beat % 1 === 0) {
+    if (beat % 2 === 0) playKick(when);
+    else playClap(when);
+    playTone(chord.root, when, 0.22, 0.22, "sine");          // ベース
+    if (beat % 4 === 0) chord.tones.forEach(f => playTone(f, when, 0.35, 0.07)); // コードスタブ
+    if (beat % 4 === 2) playTone(chord.tones[2] * 2, when, 0.2, 0.06, "sine");   // きらり
+  } else {
+    playHat(when);
+    playTone(chord.root * 2, when, 0.12, 0.09, "sine");      // 裏拍ベース
+  }
+
+  // カウントイン (4〜7拍目): ここから本番のリズムがはじまる合図
+  if (game.state === "play" && beat >= 4 && beat <= 7 && beat % 1 === 0) {
+    playTone(beat === 7 ? 2093 : 1568, when, 0.1, 0.2, "sine");
+  }
+}
+
+// 投げのかけ声 + ヒュッ
+function scheduleCue(note, when) {
+  whoosh(when);
+  if (note.type === "fish") voiceFish(when);
+  else if (note.type === "big") { voiceFish(when); voiceHai(when + 0.25, true); }
+  else if (note.type === "dbl") voiceHai(when, true);
+  else voiceHai(when);
+}
+
+// ---------------- ゲーム状態 ----------------
+const game = {
+  state: "title",   // title | play | practice | result
+  level: "normal",  // normal | hard | oni
+  chart: [],
+  counts: { perfect: 0, good: 0, miss: 0 },
+  streak: 0,
+  maxStreak: 0,
+  judgement: null,      // {text, color, time}
+  particles: [],
+  practiceLastBeat: 0,
+};
+
+const cat = { punchUntil: 0, dizzyUntil: 0, happyUntil: 0 };
+const monkey = { throwUntil: 0, cheerUntil: 0, oopsUntil: 0, bubble: null };  // bubble: {text, until}
+
+let songStartTime = 0;
+let nextMusicBeat = 0;
+let schedulerTimer = null;
+
+function now() { return audioCtx ? audioCtx.currentTime : performance.now() / 1000; }
+function songTime() { return now() - songStartTime; }
+function songBeat() { return songTime() / BEAT; }
+
+// ---------------- スケジューラ ----------------
+function schedulerTick() {
+  if (game.state !== "play" && game.state !== "practice") return;
+  const horizon = audioCtx.currentTime + 0.35;
+
+  // 音楽
+  while (songStartTime + nextMusicBeat * BEAT < horizon) {
+    if (game.state === "play" && nextMusicBeat >= SONG_BEATS) break;
+    scheduleMusic(nextMusicBeat, songStartTime + nextMusicBeat * BEAT);
+    nextMusicBeat += 0.5;
+  }
+
+  // れんしゅう: ノーツを補充 (4拍ごとにずっと投げる)
+  if (game.state === "practice") {
+    while (game.practiceLastBeat < songBeat() + 8) {
+      game.practiceLastBeat += 4;
+      game.chart.push({
+        id: game.chart.length,
+        hitBeat: game.practiceLastBeat,
+        cueBeat: game.practiceLastBeat - 2,
+        type: "norm",
+        emoji: THROW_EMOJIS[game.chart.length % THROW_EMOJIS.length],
+        cued: false, hit: false, missed: false, hitInfo: null, missedAt: 0,
+      });
+    }
+  }
+
+  // 投げのかけ声
+  game.chart.forEach(n => {
+    if (!n.cued && songStartTime + n.cueBeat * BEAT < horizon) {
+      n.cued = true;
+      scheduleCue(n, songStartTime + n.cueBeat * BEAT);
+    }
+  });
+
+  schedulerTimer = setTimeout(schedulerTick, 60);
+}
+
+// ---------------- 猫スプライト (image2納品アセット) ----------------
+// 全コマ読み込めたらスプライト描画、失敗時はベクター描画にフォールバック
+const CAT_H = 260;            // 描画サイズ(仮想px)
+const CAT_FEET_Y = 870;       // 元画像(1024px)内の足元の高さ
+const CAT_FIST = { x: 810, y: 575 };  // cat_punch_02 のこぶし位置(元画像座標)
+const catImgs = {};
+let catImgsLoaded = false;
+{
+  const names = ["idle_01", "idle_02", "punch_01", "punch_02", "punch_03",
+                 "happy_01", "happy_02", "miss_01", "miss_02"];
+  let loaded = 0, failed = false;
+  names.forEach(nm => {
+    const im = new Image();
+    im.onload = () => { if (++loaded === names.length && !failed) { catImgsLoaded = true; resize(); } };
+    im.onerror = () => { failed = true; };
+    im.src = `assets/characters/cat/cat_${nm}.png`;
+    catImgs[nm] = im;
+  });
+}
+
+// ---------------- モン吉スプライト (image2納品アセット) ----------------
+const MON_H = 200;
+const MON_FEET_Y = 870;
+const monImgs = {};
+let monImgsLoaded = false;
+{
+  const names = ["idle_01", "idle_02", "throw_01", "throw_02", "cheer", "oops"];
+  let loaded = 0, failed = false;
+  names.forEach(nm => {
+    const im = new Image();
+    im.onload = () => { if (++loaded === names.length && !failed) monImgsLoaded = true; };
+    im.onerror = () => { failed = true; };
+    im.src = `assets/characters/monkey/monkey_${nm}.png`;
+    monImgs[nm] = im;
+  });
+}
+
+// ---------------- 観客スプライト (image2納品アセット) ----------------
+const AUD_ANIMALS = ["rabbit", "dog", "frog", "hamster", "bear"];
+const audImgs = {};
+let audImgsLoaded = false;
+{
+  let loaded = 0, failed = false;
+  const total = AUD_ANIMALS.length * 2;
+  AUD_ANIMALS.forEach(a => ["01", "02"].forEach(f => {
+    const im = new Image();
+    im.onload = () => { if (++loaded === total && !failed) audImgsLoaded = true; };
+    im.onerror = () => { failed = true; };
+    im.src = `assets/characters/audience/aud_${a}_${f}.png`;
+    audImgs[`${a}_${f}`] = im;
+  }));
+}
+
+// ---------------- キャンバス ----------------
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+// スマホ対応: 狭い画面では「仮想解像度」に描いて全体を縮小表示する。
+// W/H は仮想座標系のサイズ。キャラの固定ピクセル寸法はそのままでOK。
+let W = 0, H = 0, DPR = 1, SCALE = 1;
+let groundY = 0, catX = 0, punchX = 0, punchY = 0, throwerX = 0, throwerY = 0;
+
+function resize() {
+  const stage = document.getElementById("stage");
+  const cssW = stage.clientWidth;
+  const cssH = stage.clientHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = cssW * DPR;
+  canvas.height = cssH * DPR;
+  // 縦持ちスマホでは仮想幅520として拡大気味に(キャラが小さくなりすぎない)
+  const designW = cssW < 600 ? 520 : 900;
+  SCALE = cssW / designW;
+  ctx.setTransform(DPR * SCALE, 0, 0, DPR * SCALE, 0, 0);
+  W = designW;
+  H = cssH / SCALE;
+  groundY = H * 0.66;
+  catX = W * 0.26;
+  if (catImgsLoaded) {
+    // スプライトのこぶし位置に判定ポイントを一致させる
+    const k = CAT_H / 1024;
+    punchX = catX + (CAT_FIST.x - 512) * k;
+    punchY = groundY + (CAT_FIST.y - CAT_FEET_Y) * k;
+  } else {
+    punchX = catX + Math.min(130, W * 0.2);
+    punchY = groundY - 72;
+  }
+  throwerX = W * 0.84;
+  throwerY = groundY - 40;
+}
+window.addEventListener("resize", resize);
+resize();
+
+// ---------------- 描画: ネコ ----------------
+function drawCat(t) {
+  if (catImgsLoaded) { drawCatSprite(t); return; }
+  drawCatVector(t);
+}
+
+// image2納品スプライト版: 状態に応じてコマを切り替える
+function drawCatSprite(t) {
+  const beat = Math.max(songBeat(), 0);
+  const playing = game.state === "play" || game.state === "practice";
+  const bounce = playing ? Math.abs(Math.sin(beat * Math.PI)) * 7 : Math.abs(Math.sin(t * 2)) * 3;
+
+  let frame, yOff = 0;
+  if (t < cat.punchUntil) {
+    // パンチ: 押した瞬間にインパクトコマ → 戻り
+    frame = (cat.punchUntil - t > 0.05) ? "punch_02" : "punch_03";
+  } else if (t < cat.dizzyUntil) {
+    // ミス: コツン → 目を回す
+    frame = (cat.dizzyUntil - t > 0.35) ? "miss_01" : "miss_02";
+  } else if (t < cat.happyUntil) {
+    // 成功: ばんざい → 小ジャンプ
+    if (cat.happyUntil - t > 0.2) { frame = "happy_01"; }
+    else { frame = "happy_02"; yOff = -12; }
+  } else {
+    // 次のノーツが近づいたら「構え」、ふだんはリズムでぴょこぴょこ
+    let windup = false;
+    if (playing) {
+      const st = songTime();
+      windup = game.chart.some(n => {
+        if (n.hit || n.missed) return false;
+        const dt = n.hitBeat * BEAT - st;
+        return dt > 0 && dt < BEAT * 0.6;
+      });
+    }
+    frame = windup ? "punch_01" : (Math.floor(beat) % 2 === 0 ? "idle_01" : "idle_02");
+    yOff = -bounce;
+  }
+
+  const k = CAT_H / 1024;
+  const x = catX - CAT_H / 2;
+  const y = groundY + (1024 - CAT_FEET_Y) * k - CAT_H + yOff;
+  ctx.drawImage(catImgs[frame], x, y, CAT_H, CAT_H);
+
+  // ミス時のくるくる星はスプライトに描き込み済みなので追加描画なし
+}
+
+// ベクター描画版 (画像未納品/読み込み失敗時のフォールバック)
+function drawCatVector(t) {
+  const beat = Math.max(songBeat(), 0);
+  const playing = game.state === "play" || game.state === "practice";
+  const bounce = playing ? Math.abs(Math.sin(beat * Math.PI)) * 7 : Math.abs(Math.sin(t * 2)) * 3;
+  const punching = t < cat.punchUntil;
+  const dizzy = t < cat.dizzyUntil;
+  const happy = t < cat.happyUntil;
+
+  const x = catX;
+  const by = groundY - 40 + bounce * 0.3;   // 体の中心
+  const hy = groundY - 100 - bounce;        // 頭の中心
+
+  ctx.save();
+  ctx.lineWidth = 3;
+
+  // しっぽ (ゆらゆら)
+  ctx.strokeStyle = "#f5a05a";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x - 30, by + 10);
+  const tailWag = Math.sin(t * 3) * 14;
+  ctx.quadraticCurveTo(x - 65, by - 10 + tailWag, x - 58, by - 45 + tailWag);
+  ctx.stroke();
+
+  // 体
+  ctx.fillStyle = "#f8b06a";
+  ctx.beginPath();
+  ctx.ellipse(x, by, 38, 42 - bounce * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // おなか
+  ctx.fillStyle = "#fff2df";
+  ctx.beginPath();
+  ctx.ellipse(x + 6, by + 8, 22, 26, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // あし
+  ctx.fillStyle = "#f8b06a";
+  ctx.beginPath();
+  ctx.ellipse(x - 14, groundY - 8, 13, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + 16, groundY - 8, 13, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // パンチする腕
+  const shoulderX = x + 18, shoulderY = by - 20;
+  ctx.strokeStyle = "#f8b06a";
+  ctx.lineWidth = 14;
+  if (punching) {
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.lineTo(punchX - 6, punchY);
+    ctx.stroke();
+    ctx.fillStyle = "#fff2df";
+    ctx.beginPath();
+    ctx.arc(punchX, punchY, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#f8b06a";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(shoulderX, shoulderY);
+    ctx.lineTo(shoulderX + 12, shoulderY + 22);
+    ctx.stroke();
+  }
+
+  // 頭
+  ctx.fillStyle = "#f8b06a";
+  ctx.beginPath();
+  ctx.arc(x + 6, hy, 34, 0, Math.PI * 2);
+  ctx.fill();
+  // 耳
+  ctx.beginPath();
+  ctx.moveTo(x - 22, hy - 18); ctx.lineTo(x - 26, hy - 46); ctx.lineTo(x - 2, hy - 30);
+  ctx.moveTo(x + 34, hy - 18); ctx.lineTo(x + 38, hy - 46); ctx.lineTo(x + 14, hy - 30);
+  ctx.fill();
+  ctx.fillStyle = "#ffd9b8";
+  ctx.beginPath();
+  ctx.moveTo(x - 20, hy - 22); ctx.lineTo(x - 23, hy - 40); ctx.lineTo(x - 7, hy - 29);
+  ctx.moveTo(x + 32, hy - 22); ctx.lineTo(x + 35, hy - 40); ctx.lineTo(x + 19, hy - 29);
+  ctx.fill();
+  // しましま
+  ctx.strokeStyle = "#e88d3a";
+  ctx.lineWidth = 4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(x + 0, hy - 32); ctx.lineTo(x + 0, hy - 24);
+  ctx.moveTo(x + 12, hy - 33); ctx.lineTo(x + 12, hy - 25);
+  ctx.stroke();
+
+  // 顔
+  ctx.fillStyle = "#4a3428";
+  ctx.strokeStyle = "#4a3428";
+  ctx.lineWidth = 2.5;
+  if (dizzy) {
+    // ぐるぐる目
+    ctx.font = "16px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("×", x - 6, hy + 2);
+    ctx.fillText("×", x + 20, hy + 2);
+    // 口 (へにゃ)
+    ctx.beginPath();
+    ctx.arc(x + 7, hy + 14, 5, Math.PI, 0);
+    ctx.stroke();
+  } else if (happy || punching) {
+    // にこにこ目 (^ ^)
+    ctx.beginPath();
+    ctx.arc(x - 6, hy + 0, 5, Math.PI, 0);
+    ctx.arc(x + 20, hy + 0, 5, Math.PI, 0);
+    ctx.stroke();
+    // 口 ω
+    ctx.beginPath();
+    ctx.arc(x + 3, hy + 12, 4, 0, Math.PI);
+    ctx.arc(x + 11, hy + 12, 4, 0, Math.PI);
+    ctx.stroke();
+  } else {
+    // ふつうの目
+    ctx.beginPath();
+    ctx.arc(x - 6, hy + 1, 3.4, 0, Math.PI * 2);
+    ctx.arc(x + 20, hy + 1, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + 3, hy + 12, 4, 0, Math.PI);
+    ctx.arc(x + 11, hy + 12, 4, 0, Math.PI);
+    ctx.stroke();
+  }
+  // ほっぺ
+  ctx.fillStyle = "rgba(255,140,140,.45)";
+  ctx.beginPath();
+  ctx.arc(x - 16, hy + 10, 6, 0, Math.PI * 2);
+  ctx.arc(x + 30, hy + 10, 6, 0, Math.PI * 2);
+  ctx.fill();
+  // ひげ
+  ctx.strokeStyle = "#4a3428";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x - 26, hy + 6); ctx.lineTo(x - 40, hy + 4);
+  ctx.moveTo(x - 26, hy + 11); ctx.lineTo(x - 40, hy + 13);
+  ctx.moveTo(x + 40, hy + 6); ctx.lineTo(x + 54, hy + 4);
+  ctx.moveTo(x + 40, hy + 11); ctx.lineTo(x + 54, hy + 13);
+  ctx.stroke();
+
+  // ミス時の星
+  if (dizzy) {
+    ctx.font = "18px serif";
+    const a = t * 6;
+    ctx.fillText("💫", x + 6 + Math.cos(a) * 34, hy - 42 + Math.sin(a) * 8);
+  }
+  ctx.restore();
+}
+
+// ---------------- 描画: 🐵と背景 ----------------
+function drawScene(t) {
+  const beat = Math.max(songBeat(), 0);
+  const playing = game.state === "play" || game.state === "practice";
+
+  // おひさま・くも
+  ctx.font = "52px serif";
+  ctx.fillText("🌞", W - 90, 70);
+  ctx.globalAlpha = 0.8;
+  ctx.font = "40px serif";
+  ctx.fillText("☁️", ((t * 8) % (W + 160)) - 80, 90);
+  ctx.fillText("☁️", ((t * 5 + W * 0.6) % (W + 160)) - 80, 150);
+  ctx.globalAlpha = 1;
+
+  // 地面
+  ctx.fillStyle = "#a8dd8a";
+  ctx.fillRect(0, groundY, W, H - groundY);
+  ctx.fillStyle = "#95d075";
+  ctx.fillRect(0, groundY, W, 8);
+  // おはな
+  ctx.font = "18px serif";
+  for (let i = 0; i < 6; i++) {
+    ctx.fillText(i % 2 ? "🌼" : "🌷", (i * 173 + 40) % W, groundY + 30 + (i * 37) % 20);
+  }
+
+  // かんきゃくのどうぶつたち (リズムでぴょこぴょこ)
+  if (audImgsLoaded) {
+    const AUD_H = 110;
+    AUD_ANIMALS.forEach((a, i) => {
+      const hopPhase = Math.abs(Math.sin((beat + i * 0.5) * Math.PI));
+      const hop = playing ? hopPhase * (game.streak >= 8 ? 18 : 10) : 0;
+      const frame = playing && hopPhase > 0.55 ? "02" : "01";
+      const cx = W * 0.12 + i * W * 0.19;
+      ctx.drawImage(audImgs[`${a}_${frame}`], cx - AUD_H / 2, H - 14 - AUD_H - hop, AUD_H, AUD_H);
+    });
+  } else {
+    const audience = ["🐰", "🐶", "🐸", "🐹", "🐻"];
+    ctx.font = "32px serif";
+    ctx.textAlign = "center";
+    audience.forEach((a, i) => {
+      const hopPhase = Math.abs(Math.sin((beat + i * 0.5) * Math.PI));
+      const hop = playing ? hopPhase * (game.streak >= 8 ? 16 : 8) : 0;
+      ctx.fillText(a, W * 0.12 + i * W * 0.19, H - 28 - hop);
+    });
+    ctx.textAlign = "left";
+  }
+
+  // 🐵 (投げる係)
+  const throwing = t < monkey.throwUntil;
+  const mBounce = playing ? Math.abs(Math.sin(beat * Math.PI)) * 6 : 0;
+  if (monImgsLoaded) {
+    // スプライト版: 投げ(振りかぶり→リリース) / ばんざい / 待機
+    let frame, yOff = -mBounce;
+    if (throwing) {
+      frame = (monkey.throwUntil - t > 0.12) ? "throw_01" : "throw_02";
+      yOff = 0;
+    } else if (t < monkey.oopsUntil) {
+      frame = "oops";
+      yOff = 0;
+    } else if (t < monkey.cheerUntil) {
+      frame = "cheer";
+      yOff = -8;
+    } else {
+      frame = Math.floor(beat) % 2 === 0 ? "idle_01" : "idle_02";
+    }
+    const k = MON_H / 1024;
+    const mx = throwerX - MON_H / 2;
+    const my = groundY + (1024 - MON_FEET_Y) * k - MON_H + yOff;
+    ctx.drawImage(monImgs[frame], mx, my, MON_H, MON_H);
+  } else {
+    ctx.save();
+    ctx.translate(throwerX, throwerY - mBounce);
+    if (throwing) { ctx.rotate(-0.18); ctx.scale(1.12, 1.12); }
+    ctx.font = "64px serif";
+    ctx.textAlign = "center";
+    ctx.fillText("🐵", 0, 20);
+    ctx.restore();
+  }
+
+  // 🐵のふきだし (かけ声)
+  if (monkey.bubble && t < monkey.bubble.until) {
+    const bx = throwerX, by = throwerY - 92;
+    ctx.font = "bold 20px sans-serif";
+    const tw = ctx.measureText(monkey.bubble.text).width;
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#e0b080";
+    ctx.lineWidth = 2.5;
+    roundRect(bx - tw / 2 - 14, by - 24, tw + 28, 38, 14);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx - 8, by + 14); ctx.lineTo(bx + 8, by + 14); ctx.lineTo(bx + 2, by + 26);
+    ctx.closePath();
+    ctx.fillStyle = "#fff"; ctx.fill();
+    ctx.fillStyle = "#ff7b3a";
+    ctx.textAlign = "center";
+    ctx.fillText(monkey.bubble.text, bx, by + 3);
+    ctx.textAlign = "left";
+  }
+
+  // パンチポイントのマーカー (拍にあわせてドキドキ)
+  const pulse = playing ? 1 + Math.abs(Math.sin(beat * Math.PI)) * 0.15 : 1;
+  ctx.strokeStyle = "rgba(255,140,66,.55)";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.arc(punchX, punchY, 26 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ---------------- 描画: 飛んでくるもの ----------------
+function drawNotes(t) {
+  const st = songTime();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  game.chart.forEach(n => {
+    const cueT = n.cueBeat * BEAT;
+    const hitT = n.hitBeat * BEAT;
+    const travel = hitT - cueT;
+
+    if (n.hit) {
+      // パンチされて飛んでいく!
+      const dt = t - n.hitInfo.t0;
+      if (dt > 1.4) return;
+      const fx = n.hitInfo.x0 + n.hitInfo.vx * dt;
+      const fy = n.hitInfo.y0 + n.hitInfo.vy * dt + 500 * dt * dt;
+      if (fx > W + 60 || fy > H + 60) return;
+      ctx.save();
+      ctx.translate(fx, fy);
+      ctx.rotate(dt * 12);
+      ctx.font = `${n.type === "big" ? 54 : 36}px serif`;
+      ctx.fillText(n.emoji, 0, 0);
+      ctx.restore();
+      return;
+    }
+
+    const prog = (st - cueT) / travel;
+    if (prog < 0) return;
+
+    if (n.missed) {
+      // 通りすぎてコロコロ…
+      const mp = (st - hitT) / travel;
+      if (mp > 1.2) return;
+      const mx = punchX - (throwerX - punchX) * mp * 0.7;
+      const my = Math.min(punchY + mp * 260, groundY - 16);
+      ctx.globalAlpha = Math.max(1 - mp, 0);
+      ctx.font = "34px serif";
+      ctx.fillText(n.emoji, mx, my);
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    if (prog > 1.3) return;
+    // 放物線で飛んでくる (スプライト時は振りかぶった手の位置から)
+    const startX = monImgsLoaded ? throwerX + 25 : throwerX - 30;
+    const startY = monImgsLoaded ? groundY - 125 : throwerY - 30;
+    const x = startX + (punchX - startX) * prog;
+    const y = startY + (punchY - startY) * prog - Math.sin(Math.min(prog, 1) * Math.PI) * 95;
+    const size = n.type === "big" ? 54 : 36;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-prog * 6);
+    ctx.font = `${size}px serif`;
+    if (n.type === "big") {
+      ctx.shadowColor = "#ffd700";
+      ctx.shadowBlur = 18;
+    }
+    ctx.fillText(n.emoji, 0, 0);
+    ctx.restore();
+  });
+
+  ctx.textBaseline = "alphabetic";
+}
+
+// ---------------- 描画: エフェクト・UI ----------------
+function drawFx(t) {
+  // パーティクル
+  game.particles = game.particles.filter(p => t - p.born < p.life);
+  ctx.textAlign = "center";
+  game.particles.forEach(p => {
+    const age = (t - p.born) / p.life;
+    ctx.globalAlpha = 1 - age;
+    ctx.font = `${p.size * (1 + age)}px serif`;
+    ctx.fillText(p.emoji, p.x + p.vx * age * 70, p.y + p.vy * age * 70 + age * age * 50);
+  });
+  ctx.globalAlpha = 1;
+
+  // 判定テキスト
+  if (game.judgement && t - game.judgement.time < 0.55) {
+    const age = (t - game.judgement.time) / 0.55;
+    ctx.globalAlpha = 1 - age;
+    ctx.fillStyle = game.judgement.color;
+    ctx.font = `bold ${30 - age * 4}px sans-serif`;
+    ctx.fillText(game.judgement.text, punchX, punchY - 60 - age * 34);
+    ctx.globalAlpha = 1;
+  }
+
+  const playing = game.state === "play" || game.state === "practice";
+  if (!playing) { ctx.textAlign = "left"; return; }
+
+  // れんぞくハート
+  if (game.streak >= 3) {
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillStyle = "#ff6f9d";
+    ctx.textAlign = "right";
+    ctx.fillText(`${game.streak} れんぞく 💖`, W - 16, 36);
+  }
+
+  // 曲の進行バー (ほんばんのみ)
+  if (game.state === "play") {
+    const progress = Math.min(Math.max(songTime() / (SONG_BEATS * BEAT), 0), 1);
+    ctx.fillStyle = "rgba(255,255,255,.6)";
+    ctx.fillRect(0, 0, W, 6);
+    ctx.fillStyle = game.level === "oni" ? "#e0446a" : "#ffa552";
+    ctx.fillRect(0, 0, W * progress, 6);
+    // レベル表示
+    ctx.fillStyle = game.level === "oni" ? "#e0446a" : "#b08050";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`${game.level === "oni" ? "🔥" : "🎵"} ${LEVELS[game.level].label}`, 14, 32);
+  } else {
+    // れんしゅう表示 (狭い画面では短縮)
+    ctx.fillStyle = "#8a7050";
+    ctx.font = "bold 20px sans-serif";
+    ctx.textAlign = "center";
+    const practiceText = W < 600
+      ? "🎓 「ハイッ!」の 2はく あとに ポン!"
+      : "🎓 れんしゅうちゅう — 「ハイッ!」の 2はく あとに ポン!";
+    ctx.fillText(practiceText, W / 2, 40);
+  }
+  ctx.textAlign = "left";
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  const t = now();
+  drawScene(t);
+  drawNotes(t);
+  drawCat(t);
+  drawFx(t);
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// ---------------- 判定 ----------------
+function spawnHitParticles(perfect) {
+  const emojis = perfect ? ["✨", "💖", "⭐", "🌟"] : ["✨", "💛"];
+  const n = perfect ? 7 : 4;
+  for (let i = 0; i < n; i++) {
+    game.particles.push({
+      x: punchX, y: punchY,
+      vx: (Math.random() - 0.2) * 4,
+      vy: -1.5 - Math.random() * 2.5,
+      emoji: emojis[i % emojis.length],
+      size: 15 + Math.random() * 13,
+      born: now(), life: 0.7,
+    });
+  }
+}
+
+function punchAction() {
+  if (game.state !== "play" && game.state !== "practice") return;
+  const t = now();
+  cat.punchUntil = t + 0.16;
+
+  const st = songTime();
+  let best = null, bestAbs = Infinity;
+  game.chart.forEach(n => {
+    if (n.hit || n.missed) return;
+    const d = Math.abs(n.hitBeat * BEAT - st);
+    if (d < bestAbs) { bestAbs = d; best = n; }
+  });
+
+  if (!best || bestAbs > GOOD_WINDOW) { sfxWhiff(); return; }
+
+  best.hit = true;
+  const perfect = bestAbs <= PERFECT_WINDOW;
+  best.hitInfo = {
+    t0: t, x0: punchX, y0: punchY,
+    vx: 350 + Math.random() * 250,
+    vy: -(380 + Math.random() * 250),
+  };
+  if (perfect) {
+    game.counts.perfect++;
+    game.judgement = { text: "ピタッ!!", color: "#ff5f8e", time: t };
+  } else {
+    game.counts.good++;
+    game.judgement = { text: "セーフ", color: "#f7a940", time: t };
+  }
+  game.streak++;
+  game.maxStreak = Math.max(game.maxStreak, game.streak);
+  cat.happyUntil = t + 0.4;
+  cat.dizzyUntil = 0;
+  monkey.cheerUntil = t + 0.35;
+  spawnHitParticles(perfect);
+  sfxHit(perfect);
+}
+
+// ミス判定 & 🐵のふきだし & 終了チェック
+setInterval(() => {
+  if (game.state !== "play" && game.state !== "practice") return;
+  const st = songTime();
+  const t = now();
+
+  game.chart.forEach(n => {
+    // ミス
+    if (!n.hit && !n.missed && st - n.hitBeat * BEAT > GOOD_WINDOW) {
+      n.missed = true;
+      n.missedAt = st;
+      game.counts.miss++;
+      game.streak = 0;
+      game.judgement = { text: "あちゃ〜", color: "#9aa5b5", time: t };
+      cat.dizzyUntil = t + 0.6;
+      monkey.oopsUntil = t + 0.6;
+      sfxMiss();
+    }
+    // 🐵の投げモーション & ふきだし
+    const cueT = n.cueBeat * BEAT;
+    if (st >= cueT && st < cueT + 0.1 && t > monkey.throwUntil - 0.1) {
+      monkey.throwUntil = t + 0.25;
+      const text = n.type === "fish" ? "サカナ〜!"
+                 : n.type === "big" ? "おおもの〜!!"
+                 : n.type === "dbl" ? "ハイッ♪"
+                 : "ハイッ!";
+      monkey.bubble = { text, until: t + 0.6 };
+    }
+  });
+
+  // 曲おわり
+  if (game.state === "play" && st > SONG_BEATS * BEAT + 0.8) endGame();
+}, 50);
+
+// ---------------- 入力 ----------------
+const PUNCH_KEYS = ["Space", "Enter", "KeyZ", "KeyJ", "KeyF"];
+window.addEventListener("keydown", e => {
+  if (e.repeat) return;
+  if (PUNCH_KEYS.includes(e.code)) {
+    e.preventDefault();
+    punchAction();
+  }
+});
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  punchAction();
+});
+
+// スマホ対策: 長押しメニュー・ピンチ拡大を無効化
+window.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("gesturestart", e => e.preventDefault());
+
+// バックグラウンドに切り替わると音声がサスペンドされ、復帰時に
+// ノーツと音がズレて全ミスになるため、プレイ中断してタイトルに戻す
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && (game.state === "play" || game.state === "practice")) {
+    clearTimeout(schedulerTimer);
+    game.state = "title";
+    game.particles = [];
+    game.judgement = null;
+    practiceBar.classList.add("hidden");
+    resultScreen.classList.add("hidden");
+    titleScreen.classList.remove("hidden");
+  }
+});
+
+// ---------------- 画面遷移 ----------------
+const titleScreen = document.getElementById("title-screen");
+const resultScreen = document.getElementById("result-screen");
+const practiceBar = document.getElementById("practice-bar");
+
+function resetPlayState() {
+  game.counts = { perfect: 0, good: 0, miss: 0 };
+  game.streak = 0;
+  game.maxStreak = 0;
+  game.particles = [];
+  game.judgement = null;
+  cat.punchUntil = cat.dizzyUntil = cat.happyUntil = 0;
+  monkey.throwUntil = 0;
+  monkey.cheerUntil = 0;
+  monkey.oopsUntil = 0;
+  monkey.bubble = null;
+  titleScreen.classList.add("hidden");
+  resultScreen.classList.add("hidden");
+  songStartTime = audioCtx.currentTime + 0.15;
+  nextMusicBeat = 0;
+  clearTimeout(schedulerTimer);
+}
+
+function applyLevel(levelKey) {
+  const lv = LEVELS[levelKey];
+  BEAT = 60 / lv.bpm;
+  PERFECT_WINDOW = lv.perfect;
+  GOOD_WINDOW = lv.good;
+}
+
+function startGame() {
+  initAudio();
+  applyLevel(game.level);
+  resetPlayState();
+  game.chart = buildChart(game.level);
+  game.state = "play";
+  practiceBar.classList.add("hidden");
+  schedulerTick();
+}
+
+function startPractice() {
+  initAudio();
+  applyLevel("normal");   // れんしゅうはゆっくり・ゆるゆる判定
+  resetPlayState();
+  game.chart = [];
+  game.practiceLastBeat = 4;
+  game.state = "practice";
+  practiceBar.classList.remove("hidden");
+  schedulerTick();
+}
+
+function endGame() {
+  game.state = "result";
+  clearTimeout(schedulerTimer);
+
+  const total = game.chart.length;
+  const score = total ? (game.counts.perfect + game.counts.good * 0.6) / total : 0;
+  let medal, rank, rankColor, msg;
+  if (game.counts.miss === 0 && game.counts.good === 0) {
+    medal = "🏆"; rank = "パーフェクト!!"; rankColor = "#e8467c";
+    msg = "でんせつのネコパンチ!! すごすぎるにゃ!!";
+  } else if (score >= 0.85) {
+    medal = "🥇"; rank = "ハイレベル!!"; rankColor = "#ff8c42";
+    msg = "メダルゲット! ノリノリだったね♪";
+  } else if (score >= 0.55) {
+    medal = "🙂"; rank = "まずまず"; rankColor = "#5eb8f7";
+    msg = "いいかんじ! もうすこしで メダルだよ";
+  } else {
+    medal = "😿"; rank = "やりなおし…"; rankColor = "#9aa5b5";
+    msg = "れんしゅうモードで リズムを つかもう!";
+  }
+
+  // 納品済みアセットがあれば猫のリザルト絵を表示 (なければ絵文字メダル)
+  const resultCat = document.getElementById("result-cat");
+  const medalEl = document.getElementById("medal-display");
+  if (catImgsLoaded) {
+    const img = score >= 0.85 ? "cat_result_win.png"
+              : score >= 0.55 ? "cat_happy_01.png"
+              : "cat_result_lose.png";
+    resultCat.src = `assets/characters/cat/${img}`;
+    resultCat.classList.remove("hidden");
+    medalEl.classList.add("hidden");
+  } else {
+    resultCat.classList.add("hidden");
+    medalEl.classList.remove("hidden");
+  }
+
+  document.getElementById("medal-display").textContent = medal;
+  const rankEl = document.getElementById("rank-display");
+  rankEl.textContent = rank;
+  rankEl.style.color = rankColor;
+  document.getElementById("result-msg").textContent = `【${LEVELS[game.level].label}】${msg}`;
+  document.getElementById("r-perfect").textContent = game.counts.perfect;
+  document.getElementById("r-good").textContent = game.counts.good;
+  document.getElementById("r-miss").textContent = game.counts.miss;
+  document.getElementById("r-streak").textContent = game.maxStreak;
+  resultScreen.classList.remove("hidden");
+
+  // ファンファーレ
+  const t = audioCtx.currentTime + 0.2;
+  const notes = score >= 0.55 ? [523.25, 659.26, 783.99, 1046.5] : [392, 349.23, 329.63];
+  notes.forEach((f, i) => playTone(f, t + i * 0.14, 0.4, 0.2));
+}
+
+document.querySelectorAll(".diff-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".diff-btn").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    game.level = btn.dataset.level;
+  });
+});
+
+document.getElementById("start-btn").addEventListener("click", startGame);
+document.getElementById("retry-btn").addEventListener("click", startGame);
+document.getElementById("practice-btn").addEventListener("click", startPractice);
+document.getElementById("end-practice-btn").addEventListener("click", e => {
+  e.stopPropagation();
+  practiceBar.classList.add("hidden");
+  startGame();
+});
+document.getElementById("back-btn").addEventListener("click", () => {
+  game.state = "title";
+  resultScreen.classList.add("hidden");
+  titleScreen.classList.remove("hidden");
+});
+</script>
+</body>
+</html>
